@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>电商商品价格采集与对比工具</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+    background: #f5f7fa;
+    color: #1f2937;
+    line-height: 1.6;
+  }
+  .header {
+    background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+    color: white;
+    padding: 32px 24px;
+    text-align: center;
+  }
+  .header h1 { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+  .header p { opacity: 0.9; font-size: 14px; }
+  .container { max-width: 1200px; margin: 0 auto; padding: 24px; }
+  .search-box {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+    margin-bottom: 24px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+  .search-box input[type="text"] {
+    flex: 1;
+    min-width: 200px;
+    padding: 12px 16px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    font-size: 15px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .search-box input[type="text"]:focus { border-color: #6366f1; }
+  .mode-group { display: flex; gap: 8px; }
+  .mode-group label {
+    padding: 10px 16px;
+    border: 2px solid #e5e7eb;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    user-select: none;
+  }
+  .mode-group input { display: none; }
+  .mode-group input:checked + span { color: #6366f1; font-weight: 600; }
+  .mode-group label:has(input:checked) { border-color: #6366f1; background: #eef2ff; }
+  .btn {
+    padding: 12px 28px;
+    background: linear-gradient(135deg, #4f46e5, #7c3aed);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 12px rgba(79,70,229,0.3); }
+  .btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+  .sample-badge {
+    display: inline-block;
+    background: #fef3c7;
+    color: #92400e;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    margin-left: 8px;
+  }
+  .stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    background: white;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    text-align: center;
+  }
+  .stat-card .label { font-size: 13px; color: #6b7280; margin-bottom: 8px; }
+  .stat-card .value { font-size: 26px; font-weight: 700; color: #4f46e5; }
+  .section {
+    background: white;
+    border-radius: 12px;
+    padding: 24px;
+    margin-bottom: 24px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  }
+  .section h2 {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 2px solid #f3f4f6;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 20px;
+  }
+  .chart-box { text-align: center; }
+  .chart-box img { max-width: 100%; border-radius: 8px; }
+  .chart-box .caption { font-size: 13px; color: #6b7280; margin-top: 8px; }
+  table { width: 100%; border-collapse: collapse; font-size: 14px; }
+  th, td { padding: 10px 12px; text-align: left; border-bottom: 1px solid #f3f4f6; }
+  th { background: #f9fafb; font-weight: 600; color: #374151; }
+  tr:hover { background: #f9fafb; }
+  .platform-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    color: white;
+  }
+  .plat-jd { background: #E1251B; }
+  .plat-taobao { background: #FF6A00; }
+  .plat-pdd { background: #E02E24; }
+  .price { color: #dc2626; font-weight: 700; }
+  .rec-list { list-style: none; }
+  .rec-item {
+    padding: 16px;
+    border-left: 4px solid #6366f1;
+    background: #f9fafb;
+    border-radius: 0 8px 8px 0;
+    margin-bottom: 12px;
+  }
+  .rec-item .rec-title { font-weight: 600; margin-bottom: 6px; }
+  .rec-item .rec-meta { font-size: 13px; color: #6b7280; margin-bottom: 4px; }
+  .rec-item .rec-score {
+    display: inline-block;
+    background: #4f46e5;
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 12px;
+    font-weight: 600;
+  }
+  .rec-item .rec-reason { font-size: 13px; color: #374151; margin-top: 6px; }
+  .text-report {
+    background: #1f2937;
+    color: #e5e7eb;
+    padding: 20px;
+    border-radius: 8px;
+    font-family: "SF Mono", Menlo, Consolas, monospace;
+    font-size: 12px;
+    white-space: pre-wrap;
+    overflow-x: auto;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+  .loading {
+    text-align: center;
+    padding: 40px;
+    color: #6b7280;
+  }
+  .spinner {
+    border: 3px solid #e5e7eb;
+    border-top: 3px solid #6366f1;
+    border-radius: 50%;
+    width: 32px;
+    height: 32px;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 12px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>🛒 电商商品价格采集与对比工具</h1>
+  <p>支持京东 / 淘宝 / 拼多多 · 批量采集 · 价格排序 · 横向对比 · 性价比推荐</p>
+</div>
+
+<div class="container">
+  <!-- 搜索框 -->
+  <div class="search-box">
+    <input type="text" id="keywordInput" placeholder="输入商品关键词，如：手机、耳机、笔记本..." value="{{ result.keyword }}">
+    <div class="mode-group">
+      <label>
+        <input type="radio" name="mode" value="demo" checked>
+        <span>演示模式</span>
+      </label>
+      <label>
+        <input type="radio" name="mode" value="real">
+        <span>真实采集</span>
+      </label>
+    </div>
+    <button class="btn" id="searchBtn" onclick="doSearch()">开始采集对比</button>
+  </div>
+
+  <div id="sampleNotice" class="section" style="background:#fef3c7; border:1px solid #fde68a;">
+    <strong>📌 当前展示为初始化示例数据</strong>：关键词「{{ result.keyword }}」的采集与对比结果。
+    可在上方输入任意关键词后点击「开始采集对比」现场运行脚本。
+  </div>
+
+  <!-- 加载中 -->
+  <div id="loading" class="section hidden">
+    <div class="spinner"></div>
+    <div>正在采集与分析数据，请稍候...</div>
+  </div>
+
+  <!-- 结果区 -->
+  <div id="resultArea">
+    <!-- 统计卡片 -->
+    <div class="stats-grid" id="statsGrid"></div>
+
+    <!-- 图表 -->
+    <div class="section">
+      <h2>📊 数据可视化</h2>
+      <div class="charts-grid" id="chartsGrid"></div>
+    </div>
+
+    <!-- 平台对比 -->
+    <div class="section">
+      <h2>🏪 各平台横向对比</h2>
+      <div id="platformTable"></div>
+    </div>
+
+    <!-- 性价比推荐 -->
+    <div class="section">
+      <h2>⭐ 性价比推荐 Top 5</h2>
+      <div id="recommendList"></div>
+    </div>
+
+    <!-- 商品列表 -->
+    <div class="section">
+      <h2>📋 商品列表（按价格从低到高）</h2>
+      <div style="overflow-x:auto;">
+        <table id="productTable">
+          <thead>
+            <tr>
+              <th>价格</th><th>平台</th><th>商品名称</th><th>销量</th><th>店铺评分</th><th>店铺</th><th>链接</th>
+            </tr>
+          </thead>
+          <tbody id="productBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 文本报告 -->
+    <div class="section">
+      <h2>📄 完整文本报告</h2>
+      <div class="text-report" id="textReport"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// 初始渲染示例数据
+const SAMPLE = {{ result | tojson }};
+
+function platformTag(p) {
+  const cls = p === '京东' ? 'plat-jd' : p === '淘宝' ? 'plat-taobao' : 'plat-pdd';
+  return '<span class="platform-tag ' + cls + '">' + p + '</span>';
+}
+
+function renderStats(data) {
+  const ov = data.overall || {};
+  const cards = [
+    { label: '采集商品总数', value: data.total, color: '#4f46e5' },
+    { label: '最低价', value: '¥' + (ov.min_price || 0).toFixed(2), color: '#059669' },
+    { label: '最高价', value: '¥' + (ov.max_price || 0).toFixed(2), color: '#dc2626' },
+    { label: '平均价', value: '¥' + (ov.avg_price || 0).toFixed(2), color: '#d97706' },
+    { label: '中位价', value: '¥' + (ov.median_price || 0).toFixed(2), color: '#7c3aed' },
+  ];
+  document.getElementById('statsGrid').innerHTML = cards.map(c =>
+    '<div class="stat-card"><div class="label">' + c.label + '</div>' +
+    '<div class="value" style="color:' + c.color + '">' + c.value + '</div></div>'
+  ).join('');
+}
+
+function renderCharts(data) {
+  const charts = data.charts || {};
+  const grid = document.getElementById('chartsGrid');
+  grid.innerHTML = '';
+  if (charts.price_distribution) {
+    grid.innerHTML += '<div class="chart-box"><img src="data:image/png;base64,' + charts.price_distribution + '"><div class="caption">价格分布直方图</div></div>';
+  }
+  if (charts.platform_comparison) {
+    grid.innerHTML += '<div class="chart-box"><img src="data:image/png;base64,' + charts.platform_comparison + '"><div class="caption">各平台价格对比与数量占比</div></div>';
+  }
+  if (charts.cost_performance) {
+    grid.innerHTML += '<div class="chart-box"><img src="data:image/png;base64,' + charts.cost_performance + '"><div class="caption">性价比评分排行</div></div>';
+  }
+}
+
+function renderPlatformTable(data) {
+  const plats = data.platforms || {};
+  let html = '<table><thead><tr><th>平台</th><th>商品数</th><th>最低价</th><th>最高价</th><th>均价</th><th>中位价</th><th>总销量</th><th>平均评分</th></tr></thead><tbody>';
+  for (const [name, s] of Object.entries(plats)) {
+    html += '<tr><td>' + platformTag(name) + '</td><td>' + s.count + '</td>' +
+      '<td class="price">¥' + s.min_price.toFixed(2) + '</td>' +
+      '<td class="price">¥' + s.max_price.toFixed(2) + '</td>' +
+      '<td>¥' + s.avg_price.toFixed(2) + '</td>' +
+      '<td>¥' + s.median_price.toFixed(2) + '</td>' +
+      '<td>' + formatSales(s.total_sales) + '</td>' +
+      '<td>' + s.avg_score.toFixed(2) + '</td></tr>';
+  }
+  html += '</tbody></table>';
+  document.getElementById('platformTable').innerHTML = html;
+}
+
+function formatSales(n) {
+  if (n >= 10000) return (n / 10000).toFixed(1) + '万';
+  return n;
+}
+
+function renderRecommendations(data) {
+  const recs = data.recommendations || [];
+  const list = document.getElementById('recommendList');
+  list.innerHTML = recs.map((r, i) =>
+    '<div class="rec-item">' +
+      '<div class="rec-title">' + (i + 1) + '. ' + platformTag(r.platform) + ' ' + r.name + '</div>' +
+      '<div class="rec-meta">价格 <span class="price">¥' + r.price.toFixed(2) + '</span> · 销量 ' + formatSales(r.sales) +
+      ' · 评分 ' + r.store_score.toFixed(2) + ' · ' +
+      '<span class="rec-score">性价比 ' + r.cost_performance_score.toFixed(3) + '</span></div>' +
+      '<div class="rec-reason">💡 ' + r.recommendation + '</div>' +
+      '<div class="rec-meta">🔗 <a href="' + r.url + '" target="_blank" style="color:#6366f1;">' + r.url + '</a></div>' +
+    '</div>'
+  ).join('');
+}
+
+function renderProducts(data) {
+  const products = data.products || [];
+  const body = document.getElementById('productBody');
+  body.innerHTML = products.slice(0, 50).map(p =>
+    '<tr><td class="price">¥' + p.price.toFixed(2) + '</td>' +
+    '<td>' + platformTag(p.platform) + '</td>' +
+    '<td>' + p.name + '</td>' +
+    '<td>' + formatSales(p.sales) + '</td>' +
+    '<td>' + p.store_score.toFixed(2) + '</td>' +
+    '<td>' + p.store_name + '</td>' +
+    '<td><a href="' + p.url + '" target="_blank" style="color:#6366f1;">查看</a></td></tr>'
+  ).join('');
+}
+
+function renderAll(data) {
+  renderStats(data);
+  renderCharts(data);
+  renderPlatformTable(data);
+  renderRecommendations(data);
+  renderProducts(data);
+  document.getElementById('textReport').textContent = data.text_report || '';
+}
+
+async function doSearch() {
+  const keyword = document.getElementById('keywordInput').value.trim();
+  if (!keyword) { alert('请输入关键词'); return; }
+  const mode = document.querySelector('input[name="mode"]:checked').value;
+  document.getElementById('sampleNotice').classList.add('hidden');
+  document.getElementById('loading').classList.remove('hidden');
+  document.getElementById('resultArea').classList.add('hidden');
+  try {
+    const resp = await fetch('/search', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/x-www-form-urlencoded'},
+      body: 'keyword=' + encodeURIComponent(keyword) + '&mode=' + mode
+    });
+    const data = await resp.json();
+    if (data.error) { alert(data.error); return; }
+    renderAll(data);
+  } catch (e) {
+    alert('请求失败: ' + e.message);
+  } finally {
+    document.getElementById('loading').classList.add('hidden');
+    document.getElementById('resultArea').classList.remove('hidden');
+  }
+}
+
+// 页面初始化：渲染示例数据
+renderAll(SAMPLE);
+</script>
+</body>
+</html>
